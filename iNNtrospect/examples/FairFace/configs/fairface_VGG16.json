@@ -1,0 +1,15 @@
+{
+  "model_path": null,
+  "model_name": "VGG16",
+  "layer_names_of_interest": [
+    "block1_pool",
+    "block2_pool",
+    "block3_pool",
+    "block4_pool",
+    "block5_pool",
+    "fc1"
+  ],
+  "data_path": "processed_data/fairface/race/",
+  "processed_corpus_path": "output/fairface/race/VGG16/",
+  "use_aligned_naps": false
+}

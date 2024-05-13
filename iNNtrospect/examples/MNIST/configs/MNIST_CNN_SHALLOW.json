@@ -1,0 +1,11 @@
+{
+  "model_path": "examples/MNIST/models/MNIST_CNN_SHALLOW",
+  "layer_names_of_interest": [
+    "conv2d_24",
+    "conv2d_25",
+    "flatten_8"
+  ],
+  "data_path": "processed_data/MNIST/",
+  "processed_corpus_path": "output/MNIST_CNN",
+  "use_aligned_naps": true
+}

@@ -1,0 +1,10 @@
+class OUTPUT_DIRECTORY_NAMES:
+    ACTS = "acts"
+    GRADS = "grads"
+    ALIGNED = "aligned"
+    NAPS = "naps"
+    INSTANCE_PROJECTION_DATA = "vis_data/instance_projection"
+    INSTANCE_PROJECTION_PLOTS = "plots/instance_projection"
+    CONTRASTIVE_NAPS = "contrastive_naps"
+    TOPOMAP_DATA = "vis_data/topomap"
+    TOPOMAP_PLOTS = "plots/topomap"

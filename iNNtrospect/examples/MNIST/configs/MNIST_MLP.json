@@ -1,0 +1,9 @@
+{
+  "model_path": "examples/MNIST/models/MNIST_MLP",
+  "layer_names_of_interest": [
+    "layer_2"
+  ],
+  "data_path": "processed_data/MNIST/",
+  "processed_corpus_path": "output/MNIST_MLP",
+  "use_aligned_naps": false
+}
