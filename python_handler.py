@@ -37,7 +37,7 @@ class PythonState:
                 #return b'No model set! Please load a model before calling this function.', False
 
             json_responses = []
-            for layer_name in ['dense_2', 'dense_3']:
+            for layer_name in ['dense', 'dense_1']:
                 print('Processed layer {}'.format(layer_name))
                 layer = self.model.get_layer(layer_name)
                 w = layer.get_weights()
@@ -176,16 +176,17 @@ class PythonState:
             return json_w, True
         elif request == "send_subset_activations":
             response = b'Received Request. Expecting the index next.'
-            input_index = int(self.make_additional_requests(response, socket))
+            input_index = self.make_additional_requests(response, socket)
             if self.model is None:
                 return b'No model set yet', False
             if self.x_train is None:
                 return b'Data not set yet', False
 
+            print("Made it to here")
             file_path = 'saved_precalculations/' + self.model_name + '/subset_activations_' + str(input_index) + '.pickle'
             with open(file_path, 'rb') as handle:
                 layer_outputs = pickle.load(handle)
-
+            print("loaded the subset")
             json_w = []
             for element in layer_outputs:
                 python_list = []

@@ -18,6 +18,7 @@ while True:
         # Check if there are multiple responses or not
         if isinstance(response, list):
             print('Detected JSON List to send')
+            print(response)
             for i, message in enumerate(response):
                 print('Sending {}. message'.format(i))
                 more = i < len(response) - 1
@@ -25,6 +26,7 @@ while True:
                 print(message)
         else:
             print('Sending Response..')
+            print(response)
             socket.send_json(response)
     else:
         if isinstance(response, list):
