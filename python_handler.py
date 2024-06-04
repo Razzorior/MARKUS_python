@@ -64,6 +64,7 @@ class PythonState:
         elif request == "load_model":
             response = b'Received initial request. Now send the model name!'
             model_name = self.make_additional_requests(response, socket)
+            print("Model Name received: {}".format(str(model_name)))
             self.model = keras.models.load_model('saved_models/' + model_name + '.keras')
             self.model_name = model_name
             (self.x_train, self.y_train), (self.x_test, self.y_test) = keras.datasets.mnist.load_data()
@@ -202,7 +203,8 @@ class PythonState:
             if self.x_train is None:
                 return b'Data not set yet', False
 
-            with open('saved_precalculations/simple_mlp/average_signals.pickle', 'rb') as handle:
+            file_path = 'saved_precalculations/' + self.model_name + '/average_signals.pickle'
+            with open(file_path, 'rb') as handle:
                 average_signal_per_layer = pickle.load(handle)
 
             json_w = []
