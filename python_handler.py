@@ -6,7 +6,9 @@ import json
 import numpy as np
 import pickle
 import os
+import custom_objects
 from topomaps.src.neuron_activations import get_NWPs
+from helper_functions import convert_ndarray
 
 # functions to add: send_activations, send_input, load_input
 
@@ -65,7 +67,10 @@ class PythonState:
             response = b'Received initial request. Now send the model name!'
             model_name = self.make_additional_requests(response, socket)
             print("Model Name received: {}".format(str(model_name)))
-            self.model = keras.models.load_model('saved_models/' + model_name + '.keras')
+            if str(model_name) == "two_layer_mlp_relu_dead":
+                self.model = keras.models.load_model('saved_models/' + model_name + '.keras', custom_objects={'custom_dead_relu_initializer': custom_objects.custom_dead_relu_initializer})
+            else:
+                self.model = keras.models.load_model('saved_models/' + model_name + '.keras')
             self.model_name = model_name
             (self.x_train, self.y_train), (self.x_test, self.y_test) = keras.datasets.mnist.load_data()
             return b'Model loaded', False
@@ -134,7 +139,22 @@ class PythonState:
                 i += 1
 
             return json_responses, True
+        elif request == "send_class_average_activations":
+            if self.model is None:
+                return b'No model set yet', False
 
+            with open('saved_precalculations/'+ self.model_name +'/class_average_activations.pickle', 'rb') as handle:
+                saved_list = pickle.load(handle)
+
+            return json.dumps(saved_list, default=convert_ndarray), True
+        elif request == "send_class_average_signals":
+            if self.model is None:
+                return b'No model set yet', False
+
+            with open('saved_precalculations/'+ self.model_name +'/class_average_signals.pickle', 'rb') as handle:
+                saved_list = pickle.load(handle)
+
+            return json.dumps(saved_list, default=convert_ndarray), True
         elif request == "send_weighted_activations":
             if self.model is None:
                 return b'No model set yet', False
@@ -167,7 +187,7 @@ class PythonState:
             if self.x_train is None:
                 return b'Data not set yet', False
 
-            with open('saved_precalculations/simple_mlp/average_activations.pickle', 'rb') as handle:
+            with open('saved_precalculations/'+ self.model_name +'/average_activations.pickle', 'rb') as handle:
                 layer_outputs = pickle.load(handle)
 
             json_w = []
@@ -187,16 +207,7 @@ class PythonState:
             file_path = 'saved_precalculations/' + self.model_name + '/subset_activations_' + str(input_index) + '.pickle'
             with open(file_path, 'rb') as handle:
                 layer_outputs = pickle.load(handle)
-            print("loaded the subset")
-            json_w = []
-            for element in layer_outputs:
-                python_list = []
-                for i in range(0, element.shape[0], 100):
-                    chunk = element[i:i + 100].tolist()
-                    python_list.extend(chunk)
-                json_w.append(json.dumps(python_list))
-            return json_w, True
-
+            return json.dumps(layer_outputs, default=convert_ndarray), True
         elif request == "send_average_signals":
             if self.model is None:
                 return b'No model set yet', False
