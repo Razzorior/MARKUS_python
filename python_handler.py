@@ -10,10 +10,7 @@ import custom_objects
 from topomaps.src.neuron_activations import get_NWPs
 from helper_functions import convert_ndarray
 
-# functions to add: send_activations, send_input, load_input
-
 class PythonState:
-
     def __init__(self):
         self.model = None
         self.model_name = None
@@ -22,8 +19,6 @@ class PythonState:
         self.x_train, self.y_train, self.x_test, self.y_test = None, None, None, None
         self.input = None
         self.time_until_timeout_secs = 3.0
-
-
 
     def manage_request(self, request, socket):
         if request == "test":
@@ -227,6 +222,33 @@ class PythonState:
                 json_w.append(json.dumps(python_list))
 
             return json_w, True
+        elif request == "send_class_predictions_activations_and_sigs":
+            if self.model is None:
+                return b'No model set yet', False
+
+            json_list = []
+
+            file_path = 'saved_precalculations/' + self.model_name + '/class_correct_average_activations.pickle'
+            with open(file_path, 'rb') as handle:
+                saved_list = pickle.load(handle)
+            json_list.append(json.dumps(saved_list, default=convert_ndarray))
+
+            file_path = 'saved_precalculations/' + self.model_name + '/class_incorrect_average_activations.pickle'
+            with open(file_path, 'rb') as handle:
+                saved_list = pickle.load(handle)
+            json_list.append(json.dumps(saved_list, default=convert_ndarray))
+
+            file_path = 'saved_precalculations/' + self.model_name + '/class_correct_average_signals.pickle'
+            with open(file_path, 'rb') as handle:
+                saved_list = pickle.load(handle)
+            json_list.append(json.dumps(saved_list, default=convert_ndarray))
+
+            file_path = 'saved_precalculations/' + self.model_name + '/class_incorrect_average_signals.pickle'
+            with open(file_path, 'rb') as handle:
+                saved_list = pickle.load(handle)
+            json_list.append(json.dumps(saved_list, default=convert_ndarray))
+
+            return json_list, True
         elif request == "send_naps":
             #TODO: Make up concept of NWPs. Choose a different role / meaning than NAPs
 
