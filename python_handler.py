@@ -197,8 +197,6 @@ class PythonState:
                 return b'No model set yet', False
             if self.x_train is None:
                 return b'Data not set yet', False
-
-            print("Made it to here")
             file_path = 'saved_precalculations/' + self.model_name + '/subset_activations_' + str(input_index) + '.pickle'
             with open(file_path, 'rb') as handle:
                 layer_outputs = pickle.load(handle)
