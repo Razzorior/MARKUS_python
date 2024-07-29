@@ -9,6 +9,15 @@ import os
 import custom_objects
 from topomaps.src.neuron_activations import get_NWPs
 from helper_functions import convert_ndarray
+from enum import IntEnum
+from umap import UMAP
+
+
+class UMAPData(IntEnum):
+    output = 0
+    input = 1
+    input_and_output = 2
+    subset_activations = 3
 
 class PythonState:
     def __init__(self):
@@ -19,6 +28,7 @@ class PythonState:
         self.x_train, self.y_train, self.x_test, self.y_test = None, None, None, None
         self.input = None
         self.time_until_timeout_secs = 3.0
+
 
     def manage_request(self, request, socket):
         if request == "test":
@@ -138,10 +148,19 @@ class PythonState:
             if self.model is None:
                 return b'No model set yet', False
 
+            response = "Message received. Now send the data_type used for the UMAP embedding"
+            enum_value = int(self.make_additional_requests(response, socket))
+
             with open('saved_precalculations/'+ self.model_name +'/class_average_activations.pickle', 'rb') as handle:
                 saved_list = pickle.load(handle)
 
-            return json.dumps(saved_list, default=convert_ndarray), True
+            json_list = []
+            json_list.append(json.dumps(saved_list, default=convert_ndarray))
+            enum = UMAPData(enum_value)
+
+            res = self.calculate_embeddings(enum, saved_list)
+            json_list.append(json.dumps(res, default=convert_ndarray))
+            return json_list, True
         elif request == "send_class_average_signals":
             if self.model is None:
                 return b'No model set yet', False
@@ -298,4 +317,40 @@ class PythonState:
                 return
         decoded_message = message.decode('utf-8')
         return decoded_message
+
+    def calculate_embeddings(self, enum, class_average_signals):
+        if enum == UMAPData.input:
+            layerwise_neuron_data = []
+            for index in range(0, len(class_average_signals[0]) - 1):
+                layer_array = np.transpose(np.stack([class_average_signals[i][index] for i in range(10)]), [2, 1, 0])
+                layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
+                layerwise_neuron_data.append(layer_array)
+        elif enum == UMAPData.output:
+            layerwise_neuron_data = []
+            for index in range(1, len(class_average_signals[0])):
+                layer_array = np.transpose(np.stack([class_average_signals[i][index] for i in range(10)]), [1, 2, 0])
+                layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
+                layerwise_neuron_data.append(layer_array)
+        elif enum == UMAPData.input_and_output:
+            layerwise_neuron_data = []
+            transposed_array = [
+                [np.transpose(class_average_signals[i][j]) for j in range(len(class_average_signals[0]))] for i in
+                range(len(class_average_signals))]
+            for index in range(0, len(class_average_signals[0]) - 1):
+                layer_array = np.transpose(np.stack(
+                    [np.concatenate((transposed_array[i][index], class_average_signals[i][index + 1]), axis=1) for i in
+                     range(10)]), [1, 2, 0])
+                layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
+                layerwise_neuron_data.append(layer_array)
+        elif enum == UMAPData.input_and_output:
+            file_path = 'saved_precalculations/' + self.model_name + '/subset_activations_' + str(
+                1) + '.pickle'
+            with open(file_path, 'rb') as handle:
+                layerwise_neuron_data = pickle.load(handle)
+
+        embeddings_list = []
+        for layer in layerwise_neuron_data:
+            embeddings_list.append(UMAP(n_components=2, metric="euclidean").fit_transform(layer))
+
+        return embeddings_list
 
