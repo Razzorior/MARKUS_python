@@ -17,7 +17,11 @@ class UMAPData(IntEnum):
     output = 0
     input = 1
     input_and_output = 2
-    subset_activations = 3
+    activations = 3
+    subset_signals_output = 4
+    subset_signals_input = 5
+    subset_signals_input_and_output = 6
+    subset_activations = 7
 
 class PythonState:
     def __init__(self):
@@ -148,10 +152,18 @@ class PythonState:
             if self.model is None:
                 return b'No model set yet', False
 
+            with open('saved_precalculations/'+ self.model_name +'/class_average_activations.pickle', 'rb') as handle:
+                saved_list = pickle.load(handle)
+
+            return json.dumps(saved_list, default=convert_ndarray), True
+        elif request == "send_class_average_signals":
+            if self.model is None:
+                return b'No model set yet', False
+
             response = "Message received. Now send the data_type used for the UMAP embedding"
             enum_value = int(self.make_additional_requests(response, socket))
 
-            with open('saved_precalculations/'+ self.model_name +'/class_average_activations.pickle', 'rb') as handle:
+            with open('saved_precalculations/'+ self.model_name +'/class_average_signals.pickle', 'rb') as handle:
                 saved_list = pickle.load(handle)
 
             json_list = []
@@ -159,16 +171,10 @@ class PythonState:
             enum = UMAPData(enum_value)
 
             res = self.calculate_embeddings(enum, saved_list)
+            print(res[0][0])
             json_list.append(json.dumps(res, default=convert_ndarray))
+
             return json_list, True
-        elif request == "send_class_average_signals":
-            if self.model is None:
-                return b'No model set yet', False
-
-            with open('saved_precalculations/'+ self.model_name +'/class_average_signals.pickle', 'rb') as handle:
-                saved_list = pickle.load(handle)
-
-            return json.dumps(saved_list, default=convert_ndarray), True
         elif request == "send_weighted_activations":
             if self.model is None:
                 return b'No model set yet', False
@@ -303,7 +309,7 @@ class PythonState:
 
     # Function that asks the client for additional params, and returns said params decoded as a UTF-8 string
     def make_additional_requests(self, message, socket):
-        socket.send(message)
+        socket.send_string(str(message))
         # Wait for next message to receive layers that are supposed to be processed
         message = None
         time_start = time.time()
@@ -320,18 +326,21 @@ class PythonState:
 
     def calculate_embeddings(self, enum, class_average_signals):
         if enum == UMAPData.input:
+            print("Using Input as Data")
             layerwise_neuron_data = []
             for index in range(0, len(class_average_signals[0]) - 1):
                 layer_array = np.transpose(np.stack([class_average_signals[i][index] for i in range(10)]), [2, 1, 0])
                 layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
                 layerwise_neuron_data.append(layer_array)
         elif enum == UMAPData.output:
+            print("Using Output as Data")
             layerwise_neuron_data = []
             for index in range(1, len(class_average_signals[0])):
                 layer_array = np.transpose(np.stack([class_average_signals[i][index] for i in range(10)]), [1, 2, 0])
                 layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
                 layerwise_neuron_data.append(layer_array)
         elif enum == UMAPData.input_and_output:
+            print("Using Input and Output as Data")
             layerwise_neuron_data = []
             transposed_array = [
                 [np.transpose(class_average_signals[i][j]) for j in range(len(class_average_signals[0]))] for i in
@@ -342,15 +351,73 @@ class PythonState:
                      range(10)]), [1, 2, 0])
                 layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
                 layerwise_neuron_data.append(layer_array)
-        elif enum == UMAPData.input_and_output:
+        elif enum == UMAPData.activations:
+            print("Using Activations as Data")
+            with open('saved_precalculations/' + self.model_name + '/class_average_activations.pickle', 'rb') as handle:
+                raw_data = pickle.load(handle)
+            layerwise_neuron_data = [np.transpose(np.stack([raw_data[i][j] for i in range(len(raw_data))])) for j in range(len(raw_data[0]))][1:-1]
+        elif enum == UMAPData.subset_activations:
+            print("Using Subset Activations as Data")
             file_path = 'saved_precalculations/' + self.model_name + '/subset_activations_' + str(
                 1) + '.pickle'
             with open(file_path, 'rb') as handle:
                 layerwise_neuron_data = pickle.load(handle)
+            # Cut off input and output layers
+            layerwise_neuron_data = layerwise_neuron_data[1:-1]
+        elif enum == UMAPData.subset_signals_output:
+            print("Using Subset Output Signals as Data")
+            with open('saved_precalculations/' + self.model_name + '/subset_signals.pickle', 'rb') as handle:
+                raw_data = pickle.load(handle)
+            reshaped_results = [raw_data[i].reshape(len(raw_data[i]),
+                                                                      len(raw_data[i][0]) * len(
+                                                                          raw_data[i][0][0])) for i in
+                                     range(len(raw_data))]
+            # Cut off input layer neurons
+            layerwise_neuron_data = reshaped_results[1:]
+        elif enum == UMAPData.subset_signals_input:
+            print("Using Subset Input Signals as Data")
+            with open('saved_precalculations/' + self.model_name + '/subset_signals.pickle', 'rb') as handle:
+                raw_data = pickle.load(handle)
+
+            reshaped_results = [raw_data[i].reshape(len(raw_data[i][0]),
+                                                                      len(raw_data[i]) * len(
+                                                                          raw_data[i][0][0])) for i in
+                                     range(len(raw_data))]
+            # Cut off output layer neurons
+            layerwise_neuron_data = reshaped_results[:-1]
+        elif enum == UMAPData.subset_signals_input_and_output:
+            print("Using Subset Input and Output Signals as Data")
+            with open('saved_precalculations/' + self.model_name + '/subset_signals.pickle', 'rb') as handle:
+                raw_data = pickle.load(handle)
+            reshaped_results = [raw_data[i].reshape(len(raw_data[i]),
+                                                    len(raw_data[i][0]) * len(
+                                                        raw_data[i][0][0])) for i in
+                                range(len(raw_data))]
+            # Cut off input layer neurons
+            output_data = reshaped_results[1:]
+
+            reshaped_results = [raw_data[i].reshape(len(raw_data[i][0]),
+                                                    len(raw_data[i]) * len(
+                                                        raw_data[i][0][0])) for i in
+                                range(len(raw_data))]
+            # Cut off output layer neurons
+            input_data = reshaped_results[:-1]
+
+            layerwise_neuron_data = [np.concatenate((output_data[i], input_data[i]), axis=1) for i in
+                                     range(len(output_data))]
+        else:
+            print("Unknown enum '{}'!".format(enum))
+            return
 
         embeddings_list = []
         for layer in layerwise_neuron_data:
-            embeddings_list.append(UMAP(n_components=2, metric="euclidean").fit_transform(layer))
+            raw_embeddings = UMAP(n_components=2, metric="euclidean").fit_transform(layer)
+            # Center embeddings at zero
+            zero_centered_embeddings = raw_embeddings - np.mean(raw_embeddings, axis=0)
+            print(np.mean(zero_centered_embeddings, axis=0))
+            embeddings_list.append(zero_centered_embeddings)
 
         return embeddings_list
+
+
 

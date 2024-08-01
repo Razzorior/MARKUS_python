@@ -19,6 +19,7 @@ while True:
         if isinstance(response, list):
             print('Detected JSON List to send')
             for i, message in enumerate(response):
+
                 print('Sending {}. message'.format(i))
                 more = i < len(response) - 1
                 socket.send_json(message, flags=zmq.SNDMORE if more else 0)
