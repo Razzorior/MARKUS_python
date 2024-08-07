@@ -175,6 +175,22 @@ class PythonState:
             json_list.append(json.dumps(res, default=convert_ndarray))
 
             return json_list, True
+        elif request == "send_class_gradient_weighted_signals":
+            if self.model is None:
+                return b'No model set yet', False
+
+            with open('saved_precalculations/'+ self.model_name +'/class_average_signals.pickle', 'rb') as handle:
+                signals = pickle.load(handle)
+
+            with open('saved_precalculations/'+ self.model_name +'/class_average_gradients.pickle', 'rb') as handle:
+                gradients = pickle.load(handle)
+
+            # Multiply each signal matrix of each class and layer with the corresponding gradient matrix#
+
+            gradient_weighted_sigs = [[signals[i][j] * gradients[i][j] for j in range(len(signals[i]))] for i in
+                                      range(len(signals))]
+
+            return json.dumps(gradient_weighted_sigs, default=convert_ndarray), True
         elif request == "send_weighted_activations":
             if self.model is None:
                 return b'No model set yet', False
