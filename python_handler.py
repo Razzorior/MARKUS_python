@@ -22,6 +22,9 @@ class UMAPData(IntEnum):
     subset_signals_input = 5
     subset_signals_input_and_output = 6
     subset_activations = 7
+    gradient_weighted_output = 8
+    gradient_weighted_input = 9
+    gradient_weighted_input_and_output = 10
 
 class PythonState:
     def __init__(self):
@@ -38,6 +41,28 @@ class PythonState:
         if request == "test":
             time.sleep(1)
             return b'Hi there', False
+        elif request == "experimentCluster":
+            json_responses = []
+            #enum = UMAPData(7)
+            #for i in range(100):
+            #    print("Beginning with embedding nbr. {}".format(i))
+            #    res = self.calculate_embeddings(enum)
+            #    #list_of_embeddings.append(res)
+            #    json_responses.append(json.dumps(res, default=convert_ndarray))
+
+
+            #json_responses.append(json.dumps(list_of_embeddings, default=convert_ndarray))
+
+            #file_path = 'saved_precalculations/' + self.model_name + '/subset_activations_1.pickle'
+
+            #with open(file_path, 'rb') as handle:
+            #    layer_outputs = pickle.load(handle)
+            with open("clusteringExperiment_data.pickle", 'rb') as handle:
+                 json_responses = pickle.load(handle)
+            #json_responses.append(json.dumps(layer_outputs, default=convert_ndarray))
+            #with open("clusteringExperiment_data.pickle", 'wb') as handle:
+            #    pickle.dump(json_responses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            return json_responses, True
         elif request == "handshake":
             return (json.dumps(self.model_list), True)
         elif request == "test_tensor":
@@ -340,7 +365,26 @@ class PythonState:
         decoded_message = message.decode('utf-8')
         return decoded_message
 
-    def calculate_embeddings(self, enum, class_average_signals):
+    def limit_size(self, embeddings, max_size):
+        max_value = 0.0
+
+        for coordinate in embeddings:
+            abs_x = abs(coordinate[0])
+            abs_y = abs(coordinate[1])
+            if abs_x > max_value:
+                max_value = abs_x
+            if abs_y > max_value:
+                max_value = abs_y
+
+        if max_value > max_size:
+            scale_factor = max_size / max_value
+            for coordinate in embeddings:
+                coordinate[0] *= scale_factor
+                coordinate[1] *= scale_factor
+
+        return embeddings
+
+    def calculate_embeddings(self, enum, class_average_signals=None):
         if enum == UMAPData.input:
             print("Using Input as Data")
             layerwise_neuron_data = []
@@ -421,6 +465,63 @@ class PythonState:
 
             layerwise_neuron_data = [np.concatenate((output_data[i], input_data[i]), axis=1) for i in
                                      range(len(output_data))]
+        elif enum == UMAPData.gradient_weighted_output:
+            print("Using gradient weighted Output Signals as Data")
+            with open('saved_precalculations/' + self.model_name + '/class_average_signals.pickle', 'rb') as handle:
+                signals = pickle.load(handle)
+
+            with open('saved_precalculations/' + self.model_name + '/class_average_gradients.pickle', 'rb') as handle:
+                gradients = pickle.load(handle)
+
+                # Multiply each signal matrix of each class and layer with the corresponding gradient matrix#
+
+            gradient_weighted_sigs = [[signals[i][j] * gradients[i][j] for j in range(len(signals[i]))] for i in
+                                      range(len(signals))]
+            layerwise_neuron_data = []
+            for index in range(1, len(gradient_weighted_sigs[0])):
+                layer_array = np.transpose(np.stack([gradient_weighted_sigs[i][index] for i in range(10)]), [1, 2, 0])
+                layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
+                layerwise_neuron_data.append(layer_array)
+        elif enum == UMAPData.gradient_weighted_input:
+            print("Using gradient weighted Input Signals as Data")
+            with open('saved_precalculations/' + self.model_name + '/class_average_signals.pickle', 'rb') as handle:
+                signals = pickle.load(handle)
+
+            with open('saved_precalculations/' + self.model_name + '/class_average_gradients.pickle', 'rb') as handle:
+                gradients = pickle.load(handle)
+
+                # Multiply each signal matrix of each class and layer with the corresponding gradient matrix#
+
+            gradient_weighted_sigs = [[signals[i][j] * gradients[i][j] for j in range(len(signals[i]))] for i in
+                                      range(len(signals))]
+            layerwise_neuron_data = []
+            for index in range(0, len(gradient_weighted_sigs[0]) - 1):
+                layer_array = np.transpose(np.stack([gradient_weighted_sigs[i][index] for i in range(10)]), [2, 1, 0])
+                layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
+                layerwise_neuron_data.append(layer_array)
+        elif enum == UMAPData.gradient_weighted_input_and_output:
+            print("Using gradient weighted Input and Output Signals as Data")
+            with open('saved_precalculations/' + self.model_name + '/class_average_signals.pickle', 'rb') as handle:
+                signals = pickle.load(handle)
+
+            with open('saved_precalculations/' + self.model_name + '/class_average_gradients.pickle', 'rb') as handle:
+                gradients = pickle.load(handle)
+
+                # Multiply each signal matrix of each class and layer with the corresponding gradient matrix#
+
+            gradient_weighted_sigs = [[signals[i][j] * gradients[i][j] for j in range(len(signals[i]))] for i in
+                                      range(len(signals))]
+            layerwise_neuron_data = []
+            transposed_array = [
+                [np.transpose(gradient_weighted_sigs[i][j]) for j in range(len(gradient_weighted_sigs[0]))] for i in
+                range(len(gradient_weighted_sigs))]
+            for index in range(0, len(gradient_weighted_sigs[0]) - 1):
+                layer_array = np.transpose(np.stack(
+                    [np.concatenate((transposed_array[i][index], gradient_weighted_sigs[i][index + 1]), axis=1) for i in
+                     range(10)]), [1, 2, 0])
+                layer_array = layer_array.reshape([layer_array.shape[0], np.prod(layer_array.shape[1:])])
+                layerwise_neuron_data.append(layer_array)
+
         else:
             print("Unknown enum '{}'!".format(enum))
             return
@@ -428,9 +529,20 @@ class PythonState:
         embeddings_list = []
         for layer in layerwise_neuron_data:
             raw_embeddings = UMAP(n_components=2, metric="euclidean").fit_transform(layer)
+            #####
+            #side_length = int(np.ceil(np.sqrt(raw_embeddings.shape[0])))
+
+            # Generate the grid coordinates
+            #x_coords = np.linspace(0, side_length - 1, side_length)
+            #y_coords = np.linspace(0, side_length - 1, side_length)
+            #x, y = np.meshgrid(x_coords, y_coords)
+
+            # Combine the coordinates into an array
+            #raw_embeddings = np.vstack((x.flatten(), y.flatten())).T
+            #####
             # Center embeddings at zero
             zero_centered_embeddings = raw_embeddings - np.mean(raw_embeddings, axis=0)
-            print(np.mean(zero_centered_embeddings, axis=0))
+            #limited_embeddings = self.limit_size(zero_centered_embeddings, 1.4)
             embeddings_list.append(zero_centered_embeddings)
 
         return embeddings_list
